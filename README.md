@@ -1,4 +1,4 @@
-# AnyGame - Tower Defense
+# Mystical Defense
 
 ブラウザで遊べるタワーディフェンスゲーム。
 
