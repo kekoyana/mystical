@@ -12,14 +12,15 @@ interface Props {
 interface TowerOption {
   type: TowerType;
   label: string;
-  emoji: string;
+  symbol: string;
+  color: string;
 }
 
 const TOWER_OPTIONS: TowerOption[] = [
-  { type: 'archer', label: 'アーチャー', emoji: '🏹' },
-  { type: 'cannon', label: 'キャノン', emoji: '💣' },
-  { type: 'ice', label: 'アイス', emoji: '❄️' },
-  { type: 'thunder', label: 'サンダー', emoji: '⚡' },
+  { type: 'archer', label: 'アーチャー', symbol: '◇', color: '#00f0ff' },
+  { type: 'cannon', label: 'キャノン', symbol: '⬡', color: '#ff4466' },
+  { type: 'ice', label: 'アイス', symbol: '✦', color: '#aa44ff' },
+  { type: 'thunder', label: 'サンダー', symbol: '⚡', color: '#ffaa00' },
 ];
 
 export function TowerMenu({
@@ -41,14 +42,17 @@ export function TowerMenu({
             key={opt.type}
             style={{
               ...styles.button,
-              ...(isSelected ? styles.selected : {}),
+              borderColor: isSelected ? opt.color : 'rgba(255,255,255,0.15)',
+              boxShadow: isSelected ? `0 0 12px ${opt.color}66, inset 0 0 8px ${opt.color}22` : 'none',
               opacity: affordable ? 1 : 0.4,
             }}
             onClick={() => onSelectTower(isSelected ? null : opt.type)}
             disabled={!affordable}
           >
-            <span style={styles.emoji}>{opt.emoji}</span>
-            <span style={styles.cost}>{stats.cost}G</span>
+            <span style={{ ...styles.symbol, color: opt.color, textShadow: `0 0 8px ${opt.color}88` }}>
+              {opt.symbol}
+            </span>
+            <span style={{ ...styles.cost, color: opt.color }}>{stats.cost}G</span>
           </button>
         );
       })}
@@ -72,9 +76,12 @@ const styles: Record<string, React.CSSProperties> = {
     display: 'flex',
     gap: '8px',
     padding: '8px 16px',
-    backgroundColor: '#1a1a2e',
+    backgroundColor: 'rgba(10,15,30,0.85)',
+    backdropFilter: 'blur(8px)',
+    WebkitBackdropFilter: 'blur(8px)',
     justifyContent: 'center',
     flexWrap: 'wrap',
+    borderTop: '1px solid rgba(0,240,255,0.15)',
   },
   button: {
     display: 'flex',
@@ -84,30 +91,29 @@ const styles: Record<string, React.CSSProperties> = {
     minWidth: '60px',
     minHeight: '52px',
     padding: '6px 12px',
-    border: '2px solid #444',
+    border: '2px solid rgba(255,255,255,0.15)',
     borderRadius: '8px',
-    backgroundColor: '#2a2a4e',
-    color: '#eee',
+    backgroundColor: 'rgba(10,15,30,0.6)',
+    color: '#e0e8ff',
     cursor: 'pointer',
-    fontFamily: 'monospace',
+    fontFamily: "'Orbitron', 'Courier New', monospace",
     fontSize: '12px',
     touchAction: 'manipulation',
+    transition: 'box-shadow 0.2s, border-color 0.2s',
   },
-  selected: {
-    borderColor: '#f39c12',
-    backgroundColor: '#3a3a5e',
-  },
-  emoji: {
+  symbol: {
     fontSize: '22px',
+    lineHeight: 1,
   },
   cost: {
     fontSize: '11px',
-    color: '#f39c12',
   },
   startButton: {
-    backgroundColor: '#27ae60',
-    borderColor: '#2ecc71',
+    backgroundColor: 'rgba(0,255,136,0.1)',
+    borderColor: '#00ff88',
+    color: '#00ff88',
     fontSize: '14px',
     fontWeight: 'bold',
+    textShadow: '0 0 8px rgba(0,255,136,0.5)',
   },
 };

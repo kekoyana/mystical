@@ -1,6 +1,37 @@
 import { useRef, useEffect, useCallback, useState } from 'react';
 import { GameState, MapData } from '../game/types';
 import { createInitialState, updateGame } from '../game/engine';
+import { playShootSound, playEnemyDeathSound, playHitBaseSound } from '../audio/soundEngine';
+
+// Throttle SE to avoid audio overload
+let lastShootTime = 0;
+let lastDeathTime = 0;
+const SHOOT_THROTTLE = 80; // ms
+const DEATH_THROTTLE = 50;
+
+function processEvents(events: GameState['events']): void {
+  const now = performance.now();
+
+  for (const ev of events) {
+    switch (ev.type) {
+      case 'shoot':
+        if (now - lastShootTime > SHOOT_THROTTLE) {
+          playShootSound(ev.towerType);
+          lastShootTime = now;
+        }
+        break;
+      case 'enemyDeath':
+        if (now - lastDeathTime > DEATH_THROTTLE) {
+          playEnemyDeathSound();
+          lastDeathTime = now;
+        }
+        break;
+      case 'hitBase':
+        playHitBaseSound();
+        break;
+    }
+  }
+}
 
 export function useGameLoop(map: MapData) {
   const stateRef = useRef<GameState>(createInitialState(map));
@@ -17,10 +48,10 @@ export function useGameLoop(map: MapData) {
 
     const s = stateRef.current;
     if (s.phase !== 'won' && s.phase !== 'lost') {
-      updateGame(s, map, dt);
+      updateGame(s, map, dt * s.speed);
+      processEvents(s.events);
     }
 
-    // Trigger React re-render
     setFrame((f) => f + 1);
     rafRef.current = requestAnimationFrame(tick);
   }, [map]);

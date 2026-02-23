@@ -17,17 +17,21 @@ export function createInitialState(map: MapData): GameState {
     enemies: [],
     towers: [],
     projectiles: [],
+    effects: [],
     nextEntityId: 1,
     spawnQueue: [],
     elapsedTime: 0,
     score: 0,
     killCount: 0,
+    speed: 1,
+    events: [],
   };
 }
 
 export function updateGame(state: GameState, map: MapData, dt: number): void {
   if (state.phase === 'won' || state.phase === 'lost') return;
 
+  state.events = [];
   state.elapsedTime += dt;
 
   // Spawn enemies from queue
@@ -41,11 +45,25 @@ export function updateGame(state: GameState, map: MapData, dt: number): void {
   // Enemies reaching goal reduce HP
   for (const _id of reachedGoal) {
     state.hp -= 1;
+    state.events.push({ type: 'hitBase' });
   }
   state.enemies = state.enemies.filter((e) => !reachedGoal.includes(e.id));
 
   // Remove dead enemies
   state.enemies = state.enemies.filter((e) => e.hp > 0);
+
+  // Dark mage healing (heal nearby allies 2 HP/s)
+  for (const enemy of state.enemies) {
+    if (enemy.type !== 'darkMage' || enemy.hp <= 0) continue;
+    for (const other of state.enemies) {
+      if (other.id === enemy.id || other.hp <= 0) continue;
+      const dx = enemy.pos.x - other.pos.x;
+      const dy = enemy.pos.y - other.pos.y;
+      if (dx * dx + dy * dy <= 4) { // radius 2
+        other.hp = Math.min(other.maxHp, other.hp + 2 * dt);
+      }
+    }
+  }
 
   // Tower firing
   updateTowerFiring(state);
@@ -53,8 +71,27 @@ export function updateGame(state: GameState, map: MapData, dt: number): void {
   // Projectile movement & hits
   updateProjectiles(state, map, dt);
 
+  // Death effects for killed enemies
+  for (const enemy of state.enemies) {
+    if (enemy.hp <= 0) {
+      state.effects.push({
+        id: state.nextEntityId++,
+        type: 'death',
+        pos: { x: enemy.pos.x, y: enemy.pos.y },
+        timer: 0.3,
+        duration: 0.3,
+      });
+    }
+  }
+
   // Remove dead enemies (killed by projectiles this frame)
   state.enemies = state.enemies.filter((e) => e.hp > 0);
+
+  // Update effects
+  for (const eff of state.effects) {
+    eff.timer -= dt;
+  }
+  state.effects = state.effects.filter((e) => e.timer > 0);
 
   // Check game over
   if (state.hp <= 0) {

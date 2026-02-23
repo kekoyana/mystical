@@ -65,6 +65,20 @@ export interface Projectile {
   towerType: TowerType;
 }
 
+// === Effects ===
+
+export type EffectType = 'explosion' | 'freeze' | 'lightning' | 'death' | 'damage';
+
+export interface Effect {
+  id: number;
+  type: EffectType;
+  pos: WorldPosition;
+  timer: number;    // remaining time in seconds
+  duration: number;  // total duration
+  value?: number;    // damage number for 'damage' type
+  radius?: number;   // for explosion
+}
+
 // === Wave ===
 
 export interface WaveEntry {
@@ -82,6 +96,11 @@ export interface WaveData {
 
 export type GamePhase = 'preparing' | 'waving' | 'won' | 'lost';
 
+export type GameEvent =
+  | { type: 'shoot'; towerType: TowerType }
+  | { type: 'enemyDeath' }
+  | { type: 'hitBase' };
+
 export interface GameState {
   phase: GamePhase;
   hp: number;
@@ -92,11 +111,14 @@ export interface GameState {
   enemies: Enemy[];
   towers: Tower[];
   projectiles: Projectile[];
+  effects: Effect[];
   nextEntityId: number;
   spawnQueue: { enemyType: EnemyType; spawnAt: number }[];
   elapsedTime: number;
   score: number;
   killCount: number;
+  speed: number; // 1 or 2
+  events: GameEvent[];
 }
 
 // === Tower Stats (per level) ===
