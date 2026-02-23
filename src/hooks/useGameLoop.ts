@@ -1,13 +1,23 @@
 import { useRef, useEffect, useCallback, useState } from 'react';
 import { GameState, MapData } from '../game/types';
 import { createInitialState, updateGame } from '../game/engine';
-import { playShootSound, playEnemyDeathSound, playHitBaseSound } from '../audio/soundEngine';
+import {
+  playShootSound, playEnemyDeathSound, playHitBaseSound,
+  playMysticalStrikeSound, playComboSound, playCritSound,
+  playDodgeSound, playKillStreakSound, playWaveModifierSound,
+} from '../audio/soundEngine';
 
 // Throttle SE to avoid audio overload
 let lastShootTime = 0;
 let lastDeathTime = 0;
+let lastComboTime = 0;
+let lastCritTime = 0;
+let lastDodgeTime = 0;
 const SHOOT_THROTTLE = 80; // ms
 const DEATH_THROTTLE = 50;
+const COMBO_THROTTLE = 200;
+const CRIT_THROTTLE = 100;
+const DODGE_THROTTLE = 150;
 
 function processEvents(events: GameState['events']): void {
   const now = performance.now();
@@ -28,6 +38,33 @@ function processEvents(events: GameState['events']): void {
         break;
       case 'hitBase':
         playHitBaseSound();
+        break;
+      case 'mysticalStrike':
+        playMysticalStrikeSound();
+        break;
+      case 'combo':
+        if (now - lastComboTime > COMBO_THROTTLE) {
+          playComboSound();
+          lastComboTime = now;
+        }
+        break;
+      case 'crit':
+        if (now - lastCritTime > CRIT_THROTTLE) {
+          playCritSound();
+          lastCritTime = now;
+        }
+        break;
+      case 'dodge':
+        if (now - lastDodgeTime > DODGE_THROTTLE) {
+          playDodgeSound();
+          lastDodgeTime = now;
+        }
+        break;
+      case 'killStreak':
+        playKillStreakSound();
+        break;
+      case 'waveModifier':
+        playWaveModifierSound();
         break;
     }
   }

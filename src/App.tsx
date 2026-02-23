@@ -1,6 +1,6 @@
 import { useState, useCallback, useEffect, useRef } from 'react';
-import { TowerType, GridPosition, CellType, MapData } from './game/types';
-import { startWave, placeTower, upgradeTower, sellTower, canPlaceTower } from './game/engine';
+import { TowerType, GridPosition, CellType, MapData, WorldPosition } from './game/types';
+import { startWave, placeTower, upgradeTower, sellTower, canPlaceTower, activateMysticalStrike } from './game/engine';
 import { stages } from './game/maps';
 import { useGameLoop } from './hooks/useGameLoop';
 import { GameCanvas } from './components/GameCanvas';
@@ -83,6 +83,7 @@ function GameScreen({ map, onClear, onBack }: GameScreenProps) {
   const [selectedTower, setSelectedTower] = useState<TowerType | null>(null);
   const [selectedPlacedTower, setSelectedPlacedTower] = useState<number | null>(null);
   const [, setHoverCell] = useState<GridPosition | null>(null);
+  const [mysticalStrikeMode, setMysticalStrikeMode] = useState(false);
   const prevPhaseRef = useRef(state.phase);
 
   // Start BGM on mount
@@ -108,6 +109,9 @@ function GameScreen({ map, onClear, onBack }: GameScreenProps) {
 
   const handleCellClick = useCallback(
     (pos: GridPosition) => {
+      // If in mystical strike mode, skip tower placement
+      if (mysticalStrikeMode) return;
+
       if (selectedTower) {
         if (canPlaceTower(state, map, pos, selectedTower)) {
           mutateState((s) => {
@@ -130,8 +134,26 @@ function GameScreen({ map, onClear, onBack }: GameScreenProps) {
       }
       setSelectedPlacedTower(null);
     },
-    [selectedTower, state, mutateState, map],
+    [selectedTower, state, mutateState, map, mysticalStrikeMode],
   );
+
+  const handleWorldClick = useCallback(
+    (worldPos: WorldPosition) => {
+      if (!mysticalStrikeMode) return;
+      mutateState((s) => {
+        activateMysticalStrike(s, worldPos);
+      });
+      setMysticalStrikeMode(false);
+    },
+    [mysticalStrikeMode, mutateState],
+  );
+
+  const handleMysticalStrikeButton = useCallback(() => {
+    if (state.mysticalStrike.cooldown > 0 || state.phase !== 'waving') return;
+    setMysticalStrikeMode((prev) => !prev);
+    setSelectedTower(null);
+    setSelectedPlacedTower(null);
+  }, [state.mysticalStrike.cooldown, state.phase]);
 
   const handleStartWave = useCallback(() => {
     mutateState((s) => startWave(s, map));
@@ -158,12 +180,14 @@ function GameScreen({ map, onClear, onBack }: GameScreenProps) {
     reset();
     setSelectedTower(null);
     setSelectedPlacedTower(null);
+    setMysticalStrikeMode(false);
     startBGM();
   }, [reset]);
 
   const handleSelectTower = useCallback((type: TowerType | null) => {
     setSelectedTower(type);
     setSelectedPlacedTower(null);
+    setMysticalStrikeMode(false);
   }, []);
 
   const handleToggleSpeed = useCallback(() => {
@@ -194,17 +218,24 @@ function GameScreen({ map, onClear, onBack }: GameScreenProps) {
         onBack={onBack}
         onToggleSpeed={handleToggleSpeed}
         onToggleMute={handleToggleMute}
+        onMysticalStrike={handleMysticalStrikeButton}
         muted={isMuted()}
       />
       <div style={styles.canvasContainer}>
         <GameCanvas
           state={state}
           map={map}
-          selectedTower={selectedTower}
+          selectedTower={mysticalStrikeMode ? null : selectedTower}
           selectedPlacedTower={selectedPlacedTower}
           onCellClick={handleCellClick}
           onCellHover={setHoverCell}
+          onWorldClick={handleWorldClick}
         />
+        {mysticalStrikeMode && (
+          <div style={styles.mysticalStrikeOverlay}>
+            TAP TO STRIKE
+          </div>
+        )}
         {selectedTowerEntity && (
           <TowerInfo
             tower={selectedTowerEntity}
@@ -247,6 +278,23 @@ const styles: Record<string, React.CSSProperties> = {
     flex: 1,
     position: 'relative',
     overflow: 'hidden',
+  },
+  mysticalStrikeOverlay: {
+    position: 'absolute',
+    top: '8px',
+    left: '50%',
+    transform: 'translateX(-50%)',
+    padding: '6px 16px',
+    fontSize: '14px',
+    fontWeight: 'bold',
+    fontFamily: "'Orbitron', 'Courier New', monospace",
+    color: '#aa44ff',
+    backgroundColor: 'rgba(170,68,255,0.15)',
+    border: '1px solid #aa44ff',
+    borderRadius: '6px',
+    textShadow: '0 0 8px rgba(170,68,255,0.6)',
+    pointerEvents: 'none',
+    zIndex: 10,
   },
 };
 

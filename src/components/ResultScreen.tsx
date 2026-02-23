@@ -1,4 +1,4 @@
-import { useEffect, useState } from 'react';
+import { useEffect, useRef, useState } from 'react';
 import { GameState } from '../game/types';
 import { addScore } from '../game/ranking';
 
@@ -12,8 +12,12 @@ interface Props {
 export function ResultScreen({ state, stageId, onRetry, onBack }: Props) {
   const won = state.phase === 'won';
   const [rank, setRank] = useState<number>(0);
+  const registeredRef = useRef(false);
 
   useEffect(() => {
+    if (registeredRef.current) return;
+    registeredRef.current = true;
+
     const r = addScore({
       stageId,
       score: state.score,

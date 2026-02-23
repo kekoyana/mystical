@@ -14,10 +14,12 @@ function distance(a: WorldPosition, b: WorldPosition): number {
 /**
  * Find the best target enemy for a tower.
  * Strategy: target the enemy closest to the goal (highest waypointIndex, then furthest along).
+ * rangeMult: multiplier for tower range (e.g. PHANTOM modifier reduces range).
  */
-export function findTarget(tower: Tower, enemies: Enemy[]): Enemy | null {
+export function findTarget(tower: Tower, enemies: Enemy[], rangeMult: number = 1): Enemy | null {
   const stats = getTowerStats(tower.type, tower.level);
   const tPos = towerWorldPos(tower);
+  const effectiveRange = stats.range * rangeMult;
 
   let best: Enemy | null = null;
   let bestProgress = -1;
@@ -25,9 +27,9 @@ export function findTarget(tower: Tower, enemies: Enemy[]): Enemy | null {
   for (const enemy of enemies) {
     if (enemy.hp <= 0) continue;
     const dist = distance(tPos, enemy.pos);
-    if (dist > stats.range) continue;
+    if (dist > effectiveRange) continue;
 
-    const progress = enemy.waypointIndex + (1 - dist / stats.range);
+    const progress = enemy.waypointIndex + (1 - dist / effectiveRange);
     if (progress > bestProgress) {
       bestProgress = progress;
       best = enemy;

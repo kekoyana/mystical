@@ -1,5 +1,5 @@
 import { Enemy, EnemyType, MapData } from '../types';
-import { getEnemyStats } from '../balance';
+import { getEnemyStats, WOLF_DODGE_CHANCE, GOLEM_ARMOR } from '../balance';
 
 export function createEnemy(
   id: number,
@@ -15,8 +15,15 @@ export function createEnemy(
     maxHp: stats.hp,
     pos: { x: spawn.x, y: spawn.y },
     speed: stats.speed,
+    baseSpeed: stats.speed,
     waypointIndex: 0,
     slowTimer: 0,
     reward: stats.reward,
+    armor: type === 'golem' ? GOLEM_ARMOR : 0,
+    dodgeChance: type === 'wolf' ? WOLF_DODGE_CHANCE : 0,
+    shield: 0,
+    maxShield: 0,
+    shieldCooldown: 0,
+    lastHitTowerTypes: [],
   };
 }

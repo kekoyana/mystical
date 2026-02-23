@@ -1,15 +1,13 @@
-import { GameState, MapData, CellType, Tower, Enemy, Projectile, TowerType, GridPosition, Effect } from '../game/types';
-import { getTowerStats } from '../game/balance';
+import { GameState, MapData, CellType, Tower, Enemy, Projectile, TowerType, GridPosition, Effect, WorldPosition } from '../game/types';
+import { getTowerStats, DRAGON_AURA_RADIUS } from '../game/balance';
 
-// === Neo-Crystal Color Palette ===
+// === Aurora Ice World Color Palette ===
 
 const COLORS = {
-  fieldBg: '#0d0d1a',
-  path: '#1a1a3a',
-  blocked: '#080812',
-  buildable: '#111128',
-  buildableHover: '#1a1a44',
-  gridLine: 'rgba(0,240,255,0.06)',
+  path: '#0e1a35',
+  blocked: '#040810',
+  buildable: '#0a1028',
+  gridLine: 'rgba(120,200,255,0.05)',
   tower: {
     archer: '#00f0ff',
     cannon: '#ff4466',
@@ -27,10 +25,99 @@ const COLORS = {
   hpBar: '#00ff88',
   hpBarBg: 'rgba(255,255,255,0.15)',
   rangeCircle: 'rgba(0,240,255,0.08)',
-  spawnPoint: '#00ff88',
-  goalPoint: '#ff0066',
-  pathEdge: 'rgba(0,240,255,0.15)',
+  pathEdge: 'rgba(80,180,255,0.18)',
 };
+
+// === Aurora particles (fixed seed, no per-frame allocation) ===
+const AURORA_PARTICLES = [
+  { xBase: 0.15, yBase: 0.25, size: 40, speedX: 0.7, speedY: 0.3, hue: 0 },
+  { xBase: 0.55, yBase: 0.15, size: 35, speedX: 0.5, speedY: 0.6, hue: 1 },
+  { xBase: 0.80, yBase: 0.60, size: 45, speedX: 0.4, speedY: 0.5, hue: 2 },
+  { xBase: 0.35, yBase: 0.75, size: 30, speedX: 0.6, speedY: 0.4, hue: 0 },
+  { xBase: 0.70, yBase: 0.40, size: 38, speedX: 0.3, speedY: 0.7, hue: 1 },
+];
+
+const AURORA_COLORS = ['rgba(0,240,255,', 'rgba(200,80,255,', 'rgba(0,255,160,'];
+
+// === New drawing functions ===
+
+function drawAuroraBackground(ctx: CanvasRenderingContext2D, w: number, h: number, t: number): void {
+  // Base gradient: deep space → deep ocean
+  const grad = ctx.createLinearGradient(0, 0, 0, h);
+  grad.addColorStop(0, '#050520');
+  grad.addColorStop(0.5, '#081025');
+  grad.addColorStop(1, '#0a1a2a');
+  ctx.fillStyle = grad;
+  ctx.fillRect(0, 0, w, h);
+
+  // Aurora bands
+  const bands = [
+    { color: 'rgba(0,240,255,', yBase: 0.2, amp: 0.05, freq: 0.3, alpha: 0.04 },
+    { color: 'rgba(200,80,255,', yBase: 0.35, amp: 0.04, freq: 0.25, alpha: 0.035 },
+    { color: 'rgba(0,255,160,', yBase: 0.5, amp: 0.06, freq: 0.2, alpha: 0.03 },
+  ];
+
+  for (const band of bands) {
+    const yCenter = h * (band.yBase + Math.sin(t * band.freq) * band.amp);
+    const bandH = h * 0.15;
+    const bandGrad = ctx.createLinearGradient(0, yCenter - bandH, 0, yCenter + bandH);
+    bandGrad.addColorStop(0, `${band.color}0)`);
+    bandGrad.addColorStop(0.5, `${band.color}${band.alpha})`);
+    bandGrad.addColorStop(1, `${band.color}0)`);
+    ctx.fillStyle = bandGrad;
+    ctx.fillRect(0, yCenter - bandH, w, bandH * 2);
+  }
+}
+
+function drawAuroraParticles(ctx: CanvasRenderingContext2D, w: number, h: number, t: number): void {
+  for (const p of AURORA_PARTICLES) {
+    const x = (p.xBase + Math.sin(t * p.speedX) * 0.05) * w;
+    const y = (p.yBase + Math.cos(t * p.speedY) * 0.04) * h;
+    const colorBase = AURORA_COLORS[p.hue];
+    const grad = ctx.createRadialGradient(x, y, 0, x, y, p.size);
+    grad.addColorStop(0, `${colorBase}0.06)`);
+    grad.addColorStop(1, `${colorBase}0)`);
+    ctx.fillStyle = grad;
+    ctx.fillRect(x - p.size, y - p.size, p.size * 2, p.size * 2);
+  }
+}
+
+function drawPathGlow(
+  ctx: CanvasRenderingContext2D,
+  waypoints: WorldPosition[],
+  cellSize: number,
+  ox: number,
+  oy: number,
+  t: number,
+): void {
+  if (waypoints.length < 2) return;
+
+  // 4 light orbs travelling along the path
+  for (let orb = 0; orb < 4; orb++) {
+    const speed = 0.08 + orb * 0.01;
+    const phase = (t * speed + orb * 0.25) % 1;
+    const totalSegments = waypoints.length - 1;
+    const pos = phase * totalSegments;
+    const segIdx = Math.min(Math.floor(pos), totalSegments - 1);
+    const segT = pos - segIdx;
+
+    const a = waypoints[segIdx];
+    const b = waypoints[segIdx + 1];
+    const px = ox + (a.x + (b.x - a.x) * segT) * cellSize;
+    const py = oy + (a.y + (b.y - a.y) * segT) * cellSize;
+
+    const colorBase = orb % 2 === 0 ? 'rgba(0,240,255,' : 'rgba(0,255,160,';
+    const r = cellSize * 0.6;
+    const grad = ctx.createRadialGradient(px, py, 0, px, py, r);
+    grad.addColorStop(0, `${colorBase}0.12)`);
+    grad.addColorStop(0.5, `${colorBase}0.04)`);
+    grad.addColorStop(1, `${colorBase}0)`);
+    ctx.fillStyle = grad;
+    ctx.beginPath();
+    ctx.arc(px, py, r, 0, Math.PI * 2);
+    ctx.fill();
+  }
+}
 
 export interface RenderContext {
   canvas: HTMLCanvasElement;
@@ -59,10 +146,13 @@ export function render(
   const h = rc.canvas.height;
   const t = state.elapsedTime;
 
-  ctx.fillStyle = '#0a0a1a';
-  ctx.fillRect(0, 0, w, h);
+  // 1. Aurora background
+  drawAuroraBackground(ctx, w, h, t);
 
-  // Draw grid
+  // 2. Aurora particles
+  drawAuroraParticles(ctx, w, h, t);
+
+  // 3. Draw grid cells — ice world style
   for (let row = 0; row < map.rows; row++) {
     for (let col = 0; col < map.cols; col++) {
       const cell = map.grid[row][col];
@@ -70,48 +160,72 @@ export function render(
       const y = offsetY + row * cellSize;
 
       switch (cell) {
-        case CellType.Path:
+        case CellType.Path: {
+          // Ice path base
           ctx.fillStyle = COLORS.path;
           ctx.fillRect(x, y, cellSize, cellSize);
+          // Ice gloss overlay — time/position dependent shimmer
+          const shimmer = 0.03 + 0.02 * Math.sin(t * 1.5 + col * 0.5 + row * 0.3);
+          ctx.fillStyle = `rgba(120,200,255,${shimmer})`;
+          ctx.fillRect(x, y, cellSize, cellSize);
+          // Ice crack edges
           ctx.strokeStyle = COLORS.pathEdge;
           ctx.lineWidth = 1;
           ctx.strokeRect(x + 1, y + 1, cellSize - 2, cellSize - 2);
           break;
-        case CellType.Buildable:
-          if (hoverCell && hoverCell.col === col && hoverCell.row === row && selectedTower) {
-            ctx.fillStyle = COLORS.buildableHover;
-          } else {
-            ctx.fillStyle = COLORS.buildable;
-          }
+        }
+        case CellType.Buildable: {
+          // Ice field base
+          ctx.fillStyle = COLORS.buildable;
           ctx.fillRect(x, y, cellSize, cellSize);
+          // Subtle frost shimmer
+          const frost = 0.015 + 0.01 * Math.sin(t * 0.8 + col * 0.7 + row * 0.5);
+          ctx.fillStyle = `rgba(150,200,255,${frost})`;
+          ctx.fillRect(x, y, cellSize, cellSize);
+          // Hover: aurora glow
+          if (hoverCell && hoverCell.col === col && hoverCell.row === row && selectedTower) {
+            ctx.fillStyle = 'rgba(0,255,200,0.15)';
+            ctx.fillRect(x, y, cellSize, cellSize);
+          }
           ctx.strokeStyle = COLORS.gridLine;
           ctx.lineWidth = 1;
           ctx.setLineDash([3, 5]);
           ctx.strokeRect(x, y, cellSize, cellSize);
           ctx.setLineDash([]);
           break;
+        }
         case CellType.Blocked:
           ctx.fillStyle = COLORS.blocked;
           ctx.fillRect(x, y, cellSize, cellSize);
           break;
         case CellType.Spawn: {
+          // Cyan ↔ green pulsing spawn
           ctx.fillStyle = COLORS.path;
           ctx.fillRect(x, y, cellSize, cellSize);
-          const spawnAlpha = 0.3 + 0.25 * Math.sin(t * 3);
-          ctx.fillStyle = `rgba(0,255,136,${spawnAlpha})`;
+          const spawnPulse = (Math.sin(t * 3) + 1) * 0.5; // 0-1
+          const sr = Math.round(spawnPulse * 0);
+          const sg = Math.round(200 + spawnPulse * 55);
+          const sb = Math.round(255 - spawnPulse * 100);
+          const spawnAlpha = 0.25 + 0.2 * Math.sin(t * 3);
+          ctx.fillStyle = `rgba(${sr},${sg},${sb},${spawnAlpha})`;
           ctx.fillRect(x, y, cellSize, cellSize);
-          ctx.strokeStyle = COLORS.spawnPoint;
+          ctx.strokeStyle = `rgb(${sr},${sg},${sb})`;
           ctx.lineWidth = 2;
           ctx.strokeRect(x + 1, y + 1, cellSize - 2, cellSize - 2);
           break;
         }
         case CellType.Goal: {
+          // Magenta ↔ cyan pulsing goal
           ctx.fillStyle = COLORS.path;
           ctx.fillRect(x, y, cellSize, cellSize);
-          const goalAlpha = 0.3 + 0.25 * Math.sin(t * 3 + Math.PI);
-          ctx.fillStyle = `rgba(255,0,102,${goalAlpha})`;
+          const goalPulse = (Math.sin(t * 3 + Math.PI) + 1) * 0.5;
+          const gr = Math.round(200 * (1 - goalPulse));
+          const gg = Math.round(goalPulse * 200);
+          const gb = Math.round(180 + goalPulse * 75);
+          const goalAlpha = 0.25 + 0.2 * Math.sin(t * 3 + Math.PI);
+          ctx.fillStyle = `rgba(${gr},${gg},${gb},${goalAlpha})`;
           ctx.fillRect(x, y, cellSize, cellSize);
-          ctx.strokeStyle = COLORS.goalPoint;
+          ctx.strokeStyle = `rgb(${gr},${gg},${gb})`;
           ctx.lineWidth = 2;
           ctx.strokeRect(x + 1, y + 1, cellSize - 2, cellSize - 2);
           break;
@@ -125,6 +239,9 @@ export function render(
       }
     }
   }
+
+  // 4. Path glow — flowing light orbs
+  drawPathGlow(ctx, map.waypoints, cellSize, offsetX, offsetY, t);
 
   // Draw selected tower range
   if (selectedPlacedTower !== null) {
@@ -364,7 +481,7 @@ function drawCannonChar(ctx: CanvasRenderingContext2D, cx: number, cy: number, s
   }
 }
 
-// --- Ice Mage: floating crystal sorceress ---
+// --- Ice Mage: floating mystical sorceress ---
 function drawIceMageChar(ctx: CanvasRenderingContext2D, cx: number, cy: number, s: number, color: string, level: number, t: number): void {
   const u = s * 0.025;
   const floatY = Math.sin(t * 2) * 2 * u; // gentle floating animation
@@ -413,7 +530,7 @@ function drawIceMageChar(ctx: CanvasRenderingContext2D, cx: number, cy: number, 
   ctx.arc(cx + 2.5 * u, cy - 5 * u + floatY, 1.2 * u, 0, Math.PI * 2);
   ctx.fill();
 
-  // Orbiting crystal shards
+  // Orbiting mystical shards
   for (let i = 0; i < 3; i++) {
     const angle = t * 1.5 + (Math.PI * 2 * i) / 3;
     const orbitR = 12 * u;
@@ -439,7 +556,7 @@ function drawIceMageChar(ctx: CanvasRenderingContext2D, cx: number, cy: number, 
   ctx.moveTo(cx - 9 * u, cy - 10 * u + floatY);
   ctx.lineTo(cx - 7 * u, cy + 12 * u + floatY);
   ctx.stroke();
-  // Staff tip crystal
+  // Staff tip mystical
   ctx.fillStyle = color;
   ctx.beginPath();
   ctx.moveTo(cx - 9 * u, cy - 14 * u + floatY);
@@ -691,7 +808,7 @@ function drawEnemy(
 
   ctx.restore();
 
-  // Slow indicator — purple crystal ring
+  // Slow indicator — purple mystical ring
   if (enemy.slowTimer > 0) {
     const r = cellSize * 0.3;
     ctx.save();
@@ -714,6 +831,23 @@ function drawEnemy(
     ctx.restore();
   }
 
+  // Dragon aura ring
+  if (enemy.type === 'dragon' && enemy.hp > 0) {
+    const auraR = DRAGON_AURA_RADIUS * cellSize;
+    ctx.save();
+    ctx.globalAlpha = 0.12 + Math.sin(t * 3) * 0.05;
+    ctx.strokeStyle = '#ff8800';
+    ctx.lineWidth = 1.5;
+    ctx.setLineDash([4, 4]);
+    ctx.lineDashOffset = -t * 15;
+    ctx.beginPath();
+    ctx.arc(cx, cy, auraR, 0, Math.PI * 2);
+    ctx.stroke();
+    ctx.setLineDash([]);
+    ctx.lineDashOffset = 0;
+    ctx.restore();
+  }
+
   // HP bar
   const barW = cellSize * 0.55;
   const barH = 2.5;
@@ -731,6 +865,20 @@ function drawEnemy(
   ctx.fillStyle = hpColor;
   ctx.fillRect(barX, barY, barW * hpRatio, barH);
   ctx.restore();
+
+  // Shield bar (below HP bar)
+  if (enemy.shield > 0 && enemy.maxShield > 0) {
+    const shieldBarY = barY + barH + 1;
+    const shieldRatio = enemy.shield / enemy.maxShield;
+    ctx.fillStyle = COLORS.hpBarBg;
+    ctx.fillRect(barX, shieldBarY, barW, barH);
+    ctx.save();
+    ctx.shadowColor = '#00aaff';
+    ctx.shadowBlur = 4;
+    ctx.fillStyle = '#00aaff';
+    ctx.fillRect(barX, shieldBarY, barW * shieldRatio, barH);
+    ctx.restore();
+  }
 }
 
 // --- Goblin: small imp with pointy ears and hunched posture ---
@@ -1471,6 +1619,106 @@ function drawEffect(
       ctx.restore();
       break;
     }
+    case 'mysticalStrike': {
+      const maxR = (effect.radius ?? 2) * cellSize;
+      const r = maxR * (0.3 + progress * 0.7);
+      ctx.save();
+      ctx.globalAlpha = 1 - progress;
+
+      // Outer ring
+      ctx.strokeStyle = '#aa44ff';
+      ctx.shadowColor = '#aa44ff';
+      ctx.shadowBlur = 20;
+      ctx.lineWidth = 4 * (1 - progress);
+      ctx.beginPath();
+      ctx.arc(cx, cy, r, 0, Math.PI * 2);
+      ctx.stroke();
+
+      // Inner flash
+      ctx.fillStyle = '#cc88ff';
+      ctx.shadowColor = '#ffffff';
+      ctx.shadowBlur = 15;
+      ctx.beginPath();
+      ctx.arc(cx, cy, r * 0.2 * (1 - progress), 0, Math.PI * 2);
+      ctx.fill();
+
+      // Mystical shards
+      for (let i = 0; i < 8; i++) {
+        const angle = (Math.PI * 2 * i) / 8 + progress * Math.PI;
+        const dist = r * progress;
+        const px = cx + Math.cos(angle) * dist;
+        const py = cy + Math.sin(angle) * dist;
+        const shardR = cellSize * 0.08 * (1 - progress);
+        ctx.fillStyle = '#aa44ff';
+        ctx.beginPath();
+        ctx.moveTo(px, py - shardR);
+        ctx.lineTo(px + shardR * 0.6, py);
+        ctx.lineTo(px, py + shardR);
+        ctx.lineTo(px - shardR * 0.6, py);
+        ctx.closePath();
+        ctx.fill();
+      }
+
+      ctx.restore();
+      break;
+    }
+    case 'critDamage': {
+      const offsetY3 = -progress * cellSize * 0.7;
+      const scale = 1 + progress * 0.3;
+      ctx.save();
+      ctx.globalAlpha = 1 - progress;
+      ctx.shadowColor = '#ffaa00';
+      ctx.shadowBlur = 10;
+      ctx.fillStyle = '#ffaa00';
+      ctx.font = `bold ${Math.floor(cellSize * 0.35 * scale)}px 'Orbitron', monospace`;
+      ctx.textAlign = 'center';
+      ctx.textBaseline = 'middle';
+      ctx.fillText(effect.label ?? `${effect.value ?? 0}`, cx, cy + offsetY3);
+      ctx.restore();
+      break;
+    }
+    case 'combo': {
+      const offsetY4 = -progress * cellSize * 0.8;
+      ctx.save();
+      ctx.globalAlpha = 1 - progress * 0.8;
+      ctx.shadowColor = '#00ff88';
+      ctx.shadowBlur = 12;
+      ctx.fillStyle = '#00ff88';
+      ctx.font = `bold ${Math.floor(cellSize * 0.28)}px 'Orbitron', monospace`;
+      ctx.textAlign = 'center';
+      ctx.textBaseline = 'middle';
+      ctx.fillText(effect.label ?? 'COMBO!', cx, cy + offsetY4);
+      ctx.restore();
+      break;
+    }
+    case 'dodge': {
+      const offsetY5 = -progress * cellSize * 0.4;
+      ctx.save();
+      ctx.globalAlpha = 1 - progress;
+      ctx.shadowColor = '#ff3300';
+      ctx.shadowBlur = 6;
+      ctx.fillStyle = '#ff3300';
+      ctx.font = `bold ${Math.floor(cellSize * 0.25)}px 'Orbitron', monospace`;
+      ctx.textAlign = 'center';
+      ctx.textBaseline = 'middle';
+      ctx.fillText('MISS', cx, cy + offsetY5);
+      ctx.restore();
+      break;
+    }
+    case 'shieldHit': {
+      const r2 = cellSize * 0.35;
+      ctx.save();
+      ctx.globalAlpha = 1 - progress;
+      ctx.strokeStyle = '#00aaff';
+      ctx.shadowColor = '#00aaff';
+      ctx.shadowBlur = 10;
+      ctx.lineWidth = 2 * (1 - progress);
+      ctx.beginPath();
+      ctx.arc(cx, cy, r2 * (0.8 + progress * 0.2), 0, Math.PI * 2);
+      ctx.stroke();
+      ctx.restore();
+      break;
+    }
   }
 }
 
@@ -1488,4 +1736,15 @@ export function screenToGrid(
   const row = Math.floor((screenY - rc.offsetY) / rc.cellSize);
   if (col < 0 || col >= map.cols || row < 0 || row >= map.rows) return null;
   return { col, row };
+}
+
+export function screenToWorld(
+  rc: RenderContext,
+  screenX: number,
+  screenY: number,
+): WorldPosition {
+  return {
+    x: (screenX - rc.offsetX) / rc.cellSize,
+    y: (screenY - rc.offsetY) / rc.cellSize,
+  };
 }

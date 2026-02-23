@@ -1,5 +1,9 @@
-import { WaveData, GameState, MapData } from '../types';
+import { WaveData, GameState, MapData, WaveModifierType } from '../types';
 import { createEnemy } from '../entities/enemy';
+import {
+  WAVE_MODIFIER_CHANCE, WAVE_MODIFIER_MIN_WAVE,
+  ARMORED_MODIFIER_HP_MULT, FRENZY_MODIFIER_SPEED_MULT,
+} from '../balance';
 
 // Stage 1 wave data (10 waves - Easy)
 const stage1Waves: WaveData[] = [
@@ -109,6 +113,20 @@ export const wavesByStage: Record<string, WaveData[]> = {
   stage6: stage6Waves,
 };
 
+const MODIFIER_TYPES: ('RUSH' | 'ARMORED' | 'PHANTOM' | 'FRENZY')[] = [
+  'RUSH', 'ARMORED', 'PHANTOM', 'FRENZY',
+];
+
+/**
+ * Roll a random wave modifier. Returns null if no modifier.
+ * Only applies from wave WAVE_MODIFIER_MIN_WAVE onwards.
+ */
+export function rollWaveModifier(currentWave: number): WaveModifierType {
+  if (currentWave < WAVE_MODIFIER_MIN_WAVE) return null;
+  if (Math.random() > WAVE_MODIFIER_CHANCE) return null;
+  return MODIFIER_TYPES[Math.floor(Math.random() * MODIFIER_TYPES.length)];
+}
+
 /**
  * Build the spawn queue for a wave.
  */
@@ -131,11 +149,25 @@ export function buildSpawnQueue(
 
 /**
  * Process spawn queue: create enemies that are due.
+ * Apply wave modifier to spawned enemies.
  */
 export function processSpawnQueue(state: GameState, map: MapData): void {
   const due = state.spawnQueue.filter((s) => state.elapsedTime >= s.spawnAt);
   for (const spawn of due) {
     const enemy = createEnemy(state.nextEntityId++, spawn.enemyType, map);
+
+    // Apply wave modifiers to spawned enemies
+    if (state.waveModifier === 'ARMORED') {
+      enemy.hp = Math.floor(enemy.hp * ARMORED_MODIFIER_HP_MULT);
+      enemy.maxHp = enemy.hp;
+    } else if (state.waveModifier === 'FRENZY') {
+      enemy.speed *= FRENZY_MODIFIER_SPEED_MULT;
+      enemy.baseSpeed *= FRENZY_MODIFIER_SPEED_MULT;
+    } else if (state.waveModifier === 'RUSH') {
+      // RUSH: enemies spawn faster (handled by spawn interval reduction)
+      // We modify the remaining spawn queue timing
+    }
+
     state.enemies.push(enemy);
   }
   state.spawnQueue = state.spawnQueue.filter((s) => state.elapsedTime < s.spawnAt);

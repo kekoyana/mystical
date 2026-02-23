@@ -1,4 +1,4 @@
-import { GameState } from '../game/types';
+import { GameState, WaveModifierType } from '../game/types';
 
 interface Props {
   state: GameState;
@@ -7,9 +7,22 @@ interface Props {
   onBack: () => void;
   onToggleSpeed: () => void;
   onToggleMute: () => void;
+  onMysticalStrike: () => void;
 }
 
-export function HUD({ state, mapName, muted, onBack, onToggleSpeed, onToggleMute }: Props) {
+const MODIFIER_INFO: Record<string, { label: string; color: string }> = {
+  RUSH: { label: 'RUSH', color: '#ff4466' },
+  ARMORED: { label: 'ARMORED', color: '#8888cc' },
+  PHANTOM: { label: 'PHANTOM', color: '#aa44ff' },
+  FRENZY: { label: 'FRENZY', color: '#ffaa00' },
+};
+
+export function HUD({ state, mapName, muted, onBack, onToggleSpeed, onToggleMute, onMysticalStrike }: Props) {
+  const cs = state.mysticalStrike;
+  const csReady = cs.cooldown <= 0 && state.phase === 'waving';
+  const csProgress = cs.maxCooldown > 0 ? 1 - cs.cooldown / cs.maxCooldown : 1;
+  const streak = state.killStreak;
+
   return (
     <div style={styles.container}>
       <button style={styles.smallBtn} onClick={onBack}>
@@ -22,17 +35,79 @@ export function HUD({ state, mapName, muted, onBack, onToggleSpeed, onToggleMute
         </span>
         <span style={styles.item}>
           <span style={{ color: '#ffaa00', textShadow: '0 0 6px rgba(255,170,0,0.5)' }}>&#9679;</span> {state.gold}G
+          {streak.multiplier > 1 && (
+            <span style={{ color: '#ff4466', fontSize: '11px', marginLeft: '2px' }}>x{streak.multiplier}</span>
+          )}
         </span>
         <span style={styles.item}>
           <span style={{ color: '#00f0ff', textShadow: '0 0 6px rgba(0,240,255,0.5)' }}>&#9876;</span> {state.currentWave}/{state.totalWaves}
         </span>
       </div>
+      {/* Kill Streak */}
+      {streak.count >= 5 && (
+        <div style={styles.streakBadge}>
+          {streak.count} KILL
+        </div>
+      )}
+      {/* Mystical Strike */}
+      <button
+        style={{
+          ...styles.mysticalBtn,
+          opacity: csReady ? 1 : 0.5,
+          borderColor: csReady ? '#aa44ff' : 'rgba(170,68,255,0.3)',
+          cursor: csReady ? 'pointer' : 'default',
+        }}
+        onClick={csReady ? onMysticalStrike : undefined}
+        title="Mystical Strike (AoE)"
+      >
+        <div style={{ position: 'relative', width: '100%', height: '100%' }}>
+          {!csReady && cs.cooldown > 0 && (
+            <div style={{
+              position: 'absolute',
+              bottom: 0,
+              left: 0,
+              width: `${csProgress * 100}%`,
+              height: '2px',
+              background: '#aa44ff',
+            }} />
+          )}
+          <span>{csReady ? '◆' : `${Math.ceil(cs.cooldown)}s`}</span>
+        </div>
+      </button>
+      {/* Wave Modifier Banner */}
+      {state.waveModifier && state.phase === 'waving' && (
+        <WaveModifierBadge modifier={state.waveModifier} />
+      )}
       <button style={styles.smallBtn} onClick={onToggleMute}>
         {muted ? '🔇' : '🔊'}
       </button>
       <button style={styles.speedBtn} onClick={onToggleSpeed}>
         {state.speed}x
       </button>
+    </div>
+  );
+}
+
+function WaveModifierBadge({ modifier }: { modifier: WaveModifierType }) {
+  if (!modifier) return null;
+  const info = MODIFIER_INFO[modifier];
+  if (!info) return null;
+
+  return (
+    <div style={{
+      padding: '2px 8px',
+      fontSize: '11px',
+      fontWeight: 'bold',
+      fontFamily: "'Orbitron', 'Courier New', monospace",
+      border: `1px solid ${info.color}`,
+      borderRadius: '4px',
+      color: info.color,
+      backgroundColor: `${info.color}15`,
+      textShadow: `0 0 6px ${info.color}`,
+      flexShrink: 0,
+      animation: 'pulse 1.5s ease-in-out infinite',
+    }}>
+      {info.label}
     </div>
   );
 }
@@ -94,6 +169,32 @@ const styles: Record<string, React.CSSProperties> = {
     backgroundColor: 'rgba(0,240,255,0.08)',
     color: '#00f0ff',
     cursor: 'pointer',
+    flexShrink: 0,
+  },
+  mysticalBtn: {
+    padding: '4px 10px',
+    fontSize: '13px',
+    fontFamily: "'Orbitron', 'Courier New', monospace",
+    fontWeight: 'bold',
+    border: '1px solid rgba(170,68,255,0.3)',
+    borderRadius: '4px',
+    backgroundColor: 'rgba(170,68,255,0.08)',
+    color: '#aa44ff',
+    flexShrink: 0,
+    lineHeight: 1,
+    minWidth: '36px',
+    textAlign: 'center' as const,
+  },
+  streakBadge: {
+    padding: '2px 6px',
+    fontSize: '11px',
+    fontWeight: 'bold',
+    fontFamily: "'Orbitron', 'Courier New', monospace",
+    border: '1px solid #ff4466',
+    borderRadius: '4px',
+    color: '#ff4466',
+    backgroundColor: 'rgba(255,68,102,0.1)',
+    textShadow: '0 0 6px rgba(255,68,102,0.5)',
     flexShrink: 0,
   },
 };

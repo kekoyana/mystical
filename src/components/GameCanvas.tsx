@@ -1,10 +1,11 @@
 import { useRef, useEffect, useCallback } from 'react';
-import { GameState, MapData, TowerType, GridPosition } from '../game/types';
+import { GameState, MapData, TowerType, GridPosition, WorldPosition } from '../game/types';
 import {
   RenderContext,
   createRenderContext,
   render,
   screenToGrid,
+  screenToWorld,
 } from '../rendering/renderer';
 
 interface Props {
@@ -14,6 +15,7 @@ interface Props {
   selectedPlacedTower: number | null;
   onCellClick: (pos: GridPosition) => void;
   onCellHover: (pos: GridPosition | null) => void;
+  onWorldClick?: (pos: WorldPosition) => void;
 }
 
 export function GameCanvas({
@@ -23,6 +25,7 @@ export function GameCanvas({
   selectedPlacedTower,
   onCellClick,
   onCellHover,
+  onWorldClick,
 }: Props) {
   const canvasRef = useRef<HTMLCanvasElement>(null);
   const rcRef = useRef<RenderContext | null>(null);
@@ -77,12 +80,27 @@ export function GameCanvas({
     [map],
   );
 
+  const getWorldPos = useCallback(
+    (clientX: number, clientY: number): WorldPosition | null => {
+      const canvas = canvasRef.current;
+      const rc = rcRef.current;
+      if (!canvas || !rc) return null;
+      const rect = canvas.getBoundingClientRect();
+      return screenToWorld(rc, clientX - rect.left, clientY - rect.top);
+    },
+    [],
+  );
+
   const handleClick = useCallback(
     (e: React.MouseEvent) => {
+      if (onWorldClick) {
+        const worldPos = getWorldPos(e.clientX, e.clientY);
+        if (worldPos) onWorldClick(worldPos);
+      }
       const pos = getGridPos(e.clientX, e.clientY);
       if (pos) onCellClick(pos);
     },
-    [getGridPos, onCellClick],
+    [getGridPos, getWorldPos, onCellClick, onWorldClick],
   );
 
   const handleMouseMove = useCallback(
@@ -104,10 +122,14 @@ export function GameCanvas({
       e.preventDefault();
       const touch = e.touches[0];
       if (!touch) return;
+      if (onWorldClick) {
+        const worldPos = getWorldPos(touch.clientX, touch.clientY);
+        if (worldPos) onWorldClick(worldPos);
+      }
       const pos = getGridPos(touch.clientX, touch.clientY);
       if (pos) onCellClick(pos);
     },
-    [getGridPos, onCellClick],
+    [getGridPos, getWorldPos, onCellClick, onWorldClick],
   );
 
   return (

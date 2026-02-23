@@ -1,9 +1,30 @@
 import { Enemy, WorldPosition } from '../types';
+import { DRAGON_AURA_SPEED_BOOST, DRAGON_AURA_RADIUS } from '../balance';
 
 function distance(a: WorldPosition, b: WorldPosition): number {
   const dx = a.x - b.x;
   const dy = a.y - b.y;
   return Math.sqrt(dx * dx + dy * dy);
+}
+
+/**
+ * Apply dragon aura speed boost to nearby enemies.
+ */
+function applyDragonAura(enemies: Enemy[]): void {
+  const dragons = enemies.filter((e) => e.type === 'dragon' && e.hp > 0);
+  // Reset all to base speed first
+  for (const enemy of enemies) {
+    enemy.speed = enemy.baseSpeed;
+  }
+  // Then boost from each dragon
+  for (const dragon of dragons) {
+    for (const enemy of enemies) {
+      if (enemy.id === dragon.id || enemy.hp <= 0) continue;
+      if (distance(dragon.pos, enemy.pos) <= DRAGON_AURA_RADIUS) {
+        enemy.speed = enemy.baseSpeed * (1 + DRAGON_AURA_SPEED_BOOST);
+      }
+    }
+  }
 }
 
 /**
@@ -16,6 +37,9 @@ export function updateMovement(
   dt: number,
 ): number[] {
   const reachedGoal: number[] = [];
+
+  // Apply dragon aura before movement
+  applyDragonAura(enemies);
 
   for (const enemy of enemies) {
     if (enemy.waypointIndex >= waypoints.length - 1) {

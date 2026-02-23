@@ -1,7 +1,7 @@
 /**
  * Procedural sound engine using Web Audio API.
  * All sounds are generated with oscillators — no audio files needed.
- * Theme: Neo-Crystal / cyberpunk — minor key BGM, crystal shimmer SFX.
+ * Theme: Mystical / cyberpunk — minor key BGM, mystical shimmer SFX.
  */
 
 let ctx: AudioContext | null = null;
@@ -107,7 +107,7 @@ function playNoise(duration: number, volume: number): void {
 }
 
 export function playPlaceSound(): void {
-  // Crystal shimmer — high frequency sweep
+  // Mystical shimmer — high frequency sweep
   playTone(2000, 0.1, 'sine', 0.25, 3000);
   setTimeout(() => playTone(2500, 0.12, 'sine', 0.2, 3500), 40);
   setTimeout(() => playTone(3000, 0.08, 'sine', 0.15), 80);
@@ -143,7 +143,7 @@ export function playShootSound(towerType: string): void {
 }
 
 export function playEnemyDeathSound(): void {
-  // Crystal shatter — noise burst + high tone
+  // Mystical shatter — noise burst + high tone
   playNoise(0.12, 0.15);
   playTone(2000, 0.06, 'sine', 0.12, 800);
 }
@@ -170,7 +170,45 @@ export function playHitBaseSound(): void {
   playTone(200, 0.15, 'sawtooth', 0.25, 100);
 }
 
-// === BGM — Minor Key Crystal Theme ===
+export function playMysticalStrikeSound(): void {
+  // Big mystical explosion — sweep down with noise burst
+  playTone(3500, 0.15, 'sine', 0.3, 800);
+  playNoise(0.2, 0.2);
+  setTimeout(() => playTone(1200, 0.2, 'sine', 0.2, 400), 80);
+}
+
+export function playComboSound(): void {
+  // Rising shimmer — ascending tones
+  playTone(1600, 0.08, 'sine', 0.2);
+  setTimeout(() => playTone(2200, 0.08, 'sine', 0.2), 50);
+  setTimeout(() => playTone(2800, 0.1, 'sine', 0.25), 100);
+}
+
+export function playCritSound(): void {
+  // Sharp impact — quick high-frequency burst
+  playTone(2400, 0.06, 'square', 0.2, 3200);
+  playTone(120, 0.08, 'sawtooth', 0.15);
+}
+
+export function playDodgeSound(): void {
+  // Whoosh — quick frequency sweep
+  playTone(1500, 0.1, 'sine', 0.1, 500);
+}
+
+export function playKillStreakSound(): void {
+  // Escalating power-up chime
+  playTone(800, 0.08, 'sine', 0.2);
+  setTimeout(() => playTone(1000, 0.08, 'sine', 0.2), 60);
+  setTimeout(() => playTone(1400, 0.12, 'sine', 0.3), 120);
+}
+
+export function playWaveModifierSound(): void {
+  // Warning — two descending tones
+  playTone(600, 0.12, 'square', 0.15, 400);
+  setTimeout(() => playTone(500, 0.15, 'square', 0.15, 300), 120);
+}
+
+// === BGM — Minor Key Mystical Theme ===
 
 const BGM_TEMPO = 130; // BPM — slightly calmer
 const BEAT_MS = (60 / BGM_TEMPO) * 1000;

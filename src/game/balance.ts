@@ -54,3 +54,48 @@ export function getTowerStats(type: string, level: number): TowerStats {
 export function getEnemyStats(type: string): EnemyStats {
   return ENEMY_STATS[type];
 }
+
+// === Mystical Strike ===
+
+export const MYSTICAL_STRIKE_COOLDOWN = 25;  // seconds
+export const MYSTICAL_STRIKE_DAMAGE = 80;
+export const MYSTICAL_STRIKE_RADIUS = 2;     // grid cells
+
+// === Enemy Special Abilities ===
+
+export const WOLF_DODGE_CHANCE = 0.2;
+export const GOLEM_ARMOR = 5;
+export const DARK_MAGE_SHIELD_AMOUNT = 15;
+export const DARK_MAGE_SHIELD_COOLDOWN = 5;  // seconds
+export const DARK_MAGE_SHIELD_RADIUS = 2;    // grid cells
+export const DRAGON_AURA_SPEED_BOOST = 0.3;  // +30%
+export const DRAGON_AURA_RADIUS = 2.5;       // grid cells
+
+// === Critical Hit ===
+
+export const CRIT_CHANCE_BASE = 0.10;       // 10%
+export const CRIT_CHANCE_ARCHER = 0.15;     // 15% for archer
+export const CRIT_MULTIPLIER = 2;
+
+// === Combo Damage ===
+
+export const COMBO_SHATTER_BONUS = 0.3;     // ice + thunder = +30%
+export const COMBO_FROZEN_BLAST_BONUS = 0.5; // ice + cannon = +50%
+export const COMBO_CROSS_FIRE_BONUS = 0.2;  // archer + thunder = +20%
+
+// === Kill Streak ===
+
+export const KILL_STREAK_TIMEOUT = 2;       // seconds
+export const KILL_STREAK_THRESHOLDS: { kills: number; multiplier: number }[] = [
+  { kills: 20, multiplier: 3 },
+  { kills: 10, multiplier: 2 },
+  { kills: 5, multiplier: 1.5 },
+];
+
+// === Wave Modifier ===
+
+export const WAVE_MODIFIER_CHANCE = 0.35;
+export const WAVE_MODIFIER_MIN_WAVE = 3;    // wave 3 onwards (0-indexed)
+export const ARMORED_MODIFIER_HP_MULT = 1.5;
+export const FRENZY_MODIFIER_SPEED_MULT = 1.4;
+export const PHANTOM_RANGE_MULT = 0.7;      // towers get 70% range

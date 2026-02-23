@@ -1,9 +1,15 @@
-import { GameState, MapData, TowerType, GridPosition, CellType } from './types';
-import { INITIAL_HP, INITIAL_GOLD, getTowerStats, SELL_REFUND_RATE } from './balance';
+import { GameState, MapData, TowerType, GridPosition, CellType, WorldPosition } from './types';
+import {
+  INITIAL_HP, INITIAL_GOLD, getTowerStats, SELL_REFUND_RATE,
+  MYSTICAL_STRIKE_COOLDOWN, MYSTICAL_STRIKE_DAMAGE, MYSTICAL_STRIKE_RADIUS,
+  DARK_MAGE_SHIELD_AMOUNT, DARK_MAGE_SHIELD_COOLDOWN, DARK_MAGE_SHIELD_RADIUS,
+  KILL_STREAK_THRESHOLDS,
+} from './balance';
 import { updateMovement } from './systems/movement';
 import { updateTowerFiring, updateProjectiles } from './systems/combat';
-import { processSpawnQueue, buildSpawnQueue, wavesByStage } from './systems/wave';
+import { processSpawnQueue, buildSpawnQueue, wavesByStage, rollWaveModifier } from './systems/wave';
 import { createTower } from './entities/tower';
+import { findEnemiesInRadius } from './systems/targeting';
 
 export function createInitialState(map: MapData): GameState {
   const waves = wavesByStage[map.id] ?? [];
@@ -25,6 +31,16 @@ export function createInitialState(map: MapData): GameState {
     killCount: 0,
     speed: 1,
     events: [],
+    mysticalStrike: {
+      cooldown: 0,
+      maxCooldown: MYSTICAL_STRIKE_COOLDOWN,
+    },
+    killStreak: {
+      count: 0,
+      timer: 0,
+      multiplier: 1,
+    },
+    waveModifier: null,
   };
 }
 
@@ -33,6 +49,21 @@ export function updateGame(state: GameState, map: MapData, dt: number): void {
 
   state.events = [];
   state.elapsedTime += dt;
+
+  // Mystical Strike cooldown
+  if (state.mysticalStrike.cooldown > 0) {
+    state.mysticalStrike.cooldown = Math.max(0, state.mysticalStrike.cooldown - dt);
+  }
+
+  // Kill streak timer decay
+  if (state.killStreak.timer > 0) {
+    state.killStreak.timer -= dt;
+    if (state.killStreak.timer <= 0) {
+      state.killStreak.count = 0;
+      state.killStreak.timer = 0;
+      state.killStreak.multiplier = 1;
+    }
+  }
 
   // Spawn enemies from queue
   if (state.phase === 'waving') {
@@ -55,12 +86,28 @@ export function updateGame(state: GameState, map: MapData, dt: number): void {
   // Dark mage healing (heal nearby allies 2 HP/s)
   for (const enemy of state.enemies) {
     if (enemy.type !== 'darkMage' || enemy.hp <= 0) continue;
+
+    // Healing
     for (const other of state.enemies) {
       if (other.id === enemy.id || other.hp <= 0) continue;
       const dx = enemy.pos.x - other.pos.x;
       const dy = enemy.pos.y - other.pos.y;
       if (dx * dx + dy * dy <= 4) { // radius 2
         other.hp = Math.min(other.maxHp, other.hp + 2 * dt);
+      }
+    }
+
+    // Shield grant ability
+    enemy.shieldCooldown -= dt;
+    if (enemy.shieldCooldown <= 0) {
+      enemy.shieldCooldown = DARK_MAGE_SHIELD_COOLDOWN;
+      const nearby = findEnemiesInRadius(enemy.pos, DARK_MAGE_SHIELD_RADIUS, state.enemies);
+      for (const other of nearby) {
+        if (other.id === enemy.id) continue;
+        if (other.shield < DARK_MAGE_SHIELD_AMOUNT) {
+          other.shield = DARK_MAGE_SHIELD_AMOUNT;
+          other.maxShield = DARK_MAGE_SHIELD_AMOUNT;
+        }
       }
     }
   }
@@ -122,6 +169,83 @@ export function startWave(state: GameState, map: MapData): void {
   state.currentWave++;
   state.phase = 'waving';
   state.spawnQueue = buildSpawnQueue(wave, state.elapsedTime);
+
+  // Roll wave modifier (wave 3+, 0-indexed currentWave is already incremented)
+  state.waveModifier = rollWaveModifier(state.currentWave);
+  if (state.waveModifier) {
+    state.events.push({ type: 'waveModifier', modifier: state.waveModifier });
+
+    // RUSH: compress spawn timings by 40%
+    if (state.waveModifier === 'RUSH') {
+      const baseTime = state.spawnQueue.length > 0 ? state.spawnQueue[0].spawnAt : state.elapsedTime;
+      for (const spawn of state.spawnQueue) {
+        spawn.spawnAt = baseTime + (spawn.spawnAt - baseTime) * 0.6;
+      }
+    }
+  }
+}
+
+export function activateMysticalStrike(
+  state: GameState,
+  worldPos: WorldPosition,
+): boolean {
+  if (state.phase !== 'waving') return false;
+  if (state.mysticalStrike.cooldown > 0) return false;
+
+  state.mysticalStrike.cooldown = state.mysticalStrike.maxCooldown;
+
+  // Find enemies in radius
+  const targets = findEnemiesInRadius(worldPos, MYSTICAL_STRIKE_RADIUS, state.enemies);
+  for (const enemy of targets) {
+    const wasDead = enemy.hp <= 0;
+
+    // Armor still applies
+    let damage = MYSTICAL_STRIKE_DAMAGE;
+    if (enemy.shield > 0) {
+      const absorbed = Math.min(enemy.shield, damage);
+      enemy.shield -= absorbed;
+      damage -= absorbed;
+    }
+    if (enemy.armor > 0 && damage > 0) {
+      damage = Math.max(1, damage - enemy.armor);
+    }
+
+    enemy.hp -= damage;
+    if (enemy.hp <= 0 && !wasDead) {
+      enemy.hp = 0;
+      state.gold += enemy.reward;
+      state.score += enemy.reward;
+      state.killCount++;
+
+      // Kill streak
+      state.killStreak.count++;
+      state.killStreak.timer = 2;
+      let newMult = 1;
+      for (const threshold of KILL_STREAK_THRESHOLDS) {
+        if (state.killStreak.count >= threshold.kills) {
+          newMult = threshold.multiplier;
+          break;
+        }
+      }
+      state.killStreak.multiplier = newMult;
+
+      state.events.push({ type: 'enemyDeath' });
+    }
+  }
+
+  // Visual effect
+  state.effects.push({
+    id: state.nextEntityId++,
+    type: 'mysticalStrike',
+    pos: { ...worldPos },
+    timer: 0.8,
+    duration: 0.8,
+    radius: MYSTICAL_STRIKE_RADIUS,
+    value: MYSTICAL_STRIKE_DAMAGE,
+  });
+
+  state.events.push({ type: 'mysticalStrike' });
+  return true;
 }
 
 export function canPlaceTower(

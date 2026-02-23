@@ -8,8 +8,8 @@ export function TitleScreen({ onStart }: Props) {
       <style>{particleKeyframes}</style>
       <div style={styles.particles} />
       <div style={styles.container}>
-        <h1 style={styles.title}>CRYSTAL DEFENSE</h1>
-        <p style={styles.subtitle}>近未来クリスタル防衛戦</p>
+        <h1 style={styles.title}>MYSTICAL DEFENSE</h1>
+        <p style={styles.subtitle}>近未来Mystical防衛戦</p>
         <button
           style={styles.button}
           onClick={onStart}

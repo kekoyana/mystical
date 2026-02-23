@@ -50,9 +50,18 @@ export interface Enemy {
   maxHp: number;
   pos: WorldPosition;
   speed: number;
+  baseSpeed: number;
   waypointIndex: number;
   slowTimer: number;
   reward: number;
+  // Special abilities
+  armor: number;           // flat damage reduction
+  dodgeChance: number;     // 0-1 probability to dodge
+  shield: number;          // absorbs damage before HP
+  maxShield: number;
+  shieldCooldown: number;  // seconds until next shield grant (darkMage)
+  // Combo tracking
+  lastHitTowerTypes: TowerType[];
 }
 
 export interface Projectile {
@@ -67,7 +76,8 @@ export interface Projectile {
 
 // === Effects ===
 
-export type EffectType = 'explosion' | 'freeze' | 'lightning' | 'death' | 'damage';
+export type EffectType = 'explosion' | 'freeze' | 'lightning' | 'death' | 'damage'
+  | 'mysticalStrike' | 'combo' | 'critDamage' | 'dodge' | 'shieldHit';
 
 export interface Effect {
   id: number;
@@ -77,6 +87,7 @@ export interface Effect {
   duration: number;  // total duration
   value?: number;    // damage number for 'damage' type
   radius?: number;   // for explosion
+  label?: string;    // text label for combo/crit
 }
 
 // === Wave ===
@@ -92,6 +103,35 @@ export interface WaveData {
   reward: number; // bonus gold for clearing
 }
 
+// === Wave Modifier ===
+
+export type WaveModifierType = 'RUSH' | 'ARMORED' | 'PHANTOM' | 'FRENZY' | null;
+
+export interface WaveModifier {
+  type: WaveModifierType;
+  label: string;
+  description: string;
+}
+
+// === Combo ===
+
+export type ComboType = 'shatter' | 'frozenBlast' | 'crossFire';
+
+// === Mystical Strike ===
+
+export interface MysticalStrikeState {
+  cooldown: number;      // seconds remaining
+  maxCooldown: number;
+}
+
+// === Kill Streak ===
+
+export interface KillStreakState {
+  count: number;
+  timer: number;         // seconds since last kill, resets on kill
+  multiplier: number;    // current gold multiplier
+}
+
 // === Game State ===
 
 export type GamePhase = 'preparing' | 'waving' | 'won' | 'lost';
@@ -99,7 +139,13 @@ export type GamePhase = 'preparing' | 'waving' | 'won' | 'lost';
 export type GameEvent =
   | { type: 'shoot'; towerType: TowerType }
   | { type: 'enemyDeath' }
-  | { type: 'hitBase' };
+  | { type: 'hitBase' }
+  | { type: 'mysticalStrike' }
+  | { type: 'combo'; comboType: ComboType }
+  | { type: 'crit' }
+  | { type: 'dodge' }
+  | { type: 'killStreak'; count: number }
+  | { type: 'waveModifier'; modifier: WaveModifierType };
 
 export interface GameState {
   phase: GamePhase;
@@ -119,6 +165,10 @@ export interface GameState {
   killCount: number;
   speed: number; // 1 or 2
   events: GameEvent[];
+  // New mechanics
+  mysticalStrike: MysticalStrikeState;
+  killStreak: KillStreakState;
+  waveModifier: WaveModifierType;
 }
 
 // === Tower Stats (per level) ===
