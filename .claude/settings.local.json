@@ -1,0 +1,10 @@
+{
+  "permissions": {
+    "allow": [
+      "Bash(npm install)",
+      "Bash(npx tsc -b --noEmit 2>&1)",
+      "Bash(npm run build 2>&1)",
+      "Bash(npm run dev --prefix /home/kekoyana/work/_work/anygame 2>&1)"
+    ]
+  }
+}
