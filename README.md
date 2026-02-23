@@ -1,50 +1,41 @@
-# React + TypeScript + Vite
+# AnyGame - Tower Defense
 
-This template provides a minimal setup to get React working in Vite with HMR and some ESLint rules.
+ブラウザで遊べるタワーディフェンスゲーム。
 
-Currently, two official plugins are available:
+## Features
+- スマートフォン・PC 両対応（タッチ & マウス操作）
+- 1プレイ 5〜20分のカジュアルなセッション
+- 多彩なタワーと敵キャラクター
+- ランダム要素のあるウェーブ構成
+- ステージクリア型の進行
 
-- [@vitejs/plugin-react](https://github.com/vitejs/vite-plugin-react/blob/main/packages/plugin-react/README.md) uses [Babel](https://babeljs.io/) for Fast Refresh
-- [@vitejs/plugin-react-swc](https://github.com/vitejs/vite-plugin-react-swc) uses [SWC](https://swc.rs/) for Fast Refresh
+## Tech Stack
+- React 18 + TypeScript
+- Vite
+- HTML5 Canvas
 
-## Expanding the ESLint configuration
+## Getting Started
 
-If you are developing a production application, we recommend updating the configuration to enable type aware lint rules:
+```bash
+# 依存パッケージインストール
+npm install
 
-- Configure the top-level `parserOptions` property like this:
+# 開発サーバー起動
+npm run dev
 
-```js
-export default tseslint.config({
-  languageOptions: {
-    // other options...
-    parserOptions: {
-      project: ['./tsconfig.node.json', './tsconfig.app.json'],
-      tsconfigRootDir: import.meta.dirname,
-    },
-  },
-})
+# プロダクションビルド
+npm run build
 ```
 
-- Replace `tseslint.configs.recommended` to `tseslint.configs.recommendedTypeChecked` or `tseslint.configs.strictTypeChecked`
-- Optionally add `...tseslint.configs.stylisticTypeChecked`
-- Install [eslint-plugin-react](https://github.com/jsx-eslint/eslint-plugin-react) and update the config:
+## Project Structure
 
-```js
-// eslint.config.js
-import react from 'eslint-plugin-react'
-
-export default tseslint.config({
-  // Set the react version
-  settings: { react: { version: '18.3' } },
-  plugins: {
-    // Add the react plugin
-    react,
-  },
-  rules: {
-    // other rules...
-    // Enable its recommended rules
-    ...react.configs.recommended.rules,
-    ...react.configs['jsx-runtime'].rules,
-  },
-})
 ```
+src/
+├── game/         # ゲームコアロジック（React非依存）
+├── rendering/    # Canvas描画
+├── components/   # React UIコンポーネント
+├── hooks/        # カスタムフック
+└── assets/       # 静的アセット
+```
+
+詳細は [CLAUDE.md](./CLAUDE.md) を参照。
